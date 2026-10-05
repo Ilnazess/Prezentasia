@@ -93,7 +93,7 @@ const THEMES = [
 function pickRandomTheme() { return THEMES[Math.floor(Math.random() * THEMES.length)]; }
 
 // ============================================================
-// ============ АВТОПОДБОР РАЗМЕРА ШРИФТА ====================
+// ============ АВТОПОДБОР РАЗМЕРА ШРИФТА (СВОБОДНАЯ) =======
 // ============================================================
 function pickBodyFontSize(text, baseSize) {
   const len = (text || '').length;
@@ -486,40 +486,92 @@ function buildReavizPPTX(pptx, p) {
     color: '000000', fontFace: 'Times New Roman'
   });
 
-  // ===== КОНТЕНТ =====
+  // ============================================================
+  // ============ КОНТЕНТ РЕАВИЗ ===============================
+  // ============================================================
+  // Логотип РЕАВИЗ занимает область: примерно x ∈ [0, 1.55], y ∈ [0, 1.25]
+  // Всё, что правее 1.55 и ниже 1.25 — свободно.
+  // НО: мы делаем так, чтобы ЗАГОЛОВОК был на уровне логотипа по вертикали.
+  // То есть заголовок начинается сразу справа от логотипа, y = 0.3.
+  // Значит, если заголовок занимает 1 строку — всё ок.
+  // Если 2 строки — может залезть под низ логотипа. Ограничим высоту.
+
+  const CONTENT_X = 1.75;        // справа от логотипа (лого до 1.55)
+  const CONTENT_W = 7.65;        // 10 - 1.75 - 0.6 = 7.65 (правый отступ 0.6)
+  const CONTENT_TOP = 0.3;       // тот же уровень, что и логотип сверху
+  const CONTENT_BOTTOM = 5.4;    // нижняя граница — не вылезает
+  const HEADING_MAX_H = 1.1;     // заголовок может быть в 2 строки, но не больше
+
   p.slides.forEach((slide, i) => {
     const s = pptx.addSlide();
     s.background = { data: p.bgImage };
 
-    const topOffsets = [0.7, 0.85, 1.0];
-    const top = topOffsets[Math.floor(Math.random() * topOffsets.length)];
+    const headingLen = (slide.heading || '').length;
+    const bodyLen = (slide.body || '').length;
+    const totalLen = headingLen + bodyLen;
 
-    let bodyTop = top;
+    // Заголовок: 20–28pt, крупнее если короткий
+    let headingSize = 22;
+    if (headingLen < 15) headingSize = 28;
+    else if (headingLen < 30) headingSize = 26;
+    else if (headingLen < 50) headingSize = 24;
+    else if (headingLen < 80) headingSize = 22;
+    else headingSize = 20;
+
+    // Тело: 11–16pt, зависит от длины текста
+    let bodySize = 14;
+    if (totalLen < 150)       bodySize = 16;
+    else if (totalLen < 300)  bodySize = 15;
+    else if (totalLen < 450)  bodySize = 14;
+    else if (totalLen < 650)  bodySize = 13;
+    else if (totalLen < 900)  bodySize = 12;
+    else                      bodySize = 11;
+
+    // Зона заголовка: от CONTENT_TOP до CONTENT_TOP + HEADING_MAX_H
+    // Зона тела: от заголовка вниз до CONTENT_BOTTOM
+    let bodyTop = CONTENT_TOP;
 
     if (slide.heading) {
-      const hSize = pickHeadingFontSize(slide.heading);
       s.addText(slide.heading, {
-        x: 0.7, y: top, w: 8.6, h: 1.0,
-        fontSize: hSize, bold: true,
-        color: accent.heading, fontFace: 'Times New Roman',
-        valign: 'middle'
+        x: CONTENT_X,
+        y: CONTENT_TOP,
+        w: CONTENT_W,
+        h: HEADING_MAX_H,
+        fontSize: headingSize,
+        bold: true,
+        color: accent.heading,
+        fontFace: 'Times New Roman',
+        valign: 'top',
+        fit: 'shrink'
       });
+
+      // Линия под заголовком
       s.addShape(pptx.ShapeType.rect, {
-        x: 0.7, y: top + 0.95, w: jitter(2.0, 0.3), h: 0.03,
+        x: CONTENT_X,
+        y: CONTENT_TOP + HEADING_MAX_H - 0.05,
+        w: Math.min(2.0, CONTENT_W),
+        h: 0.03,
         fill: { color: accent.line }
       });
-      bodyTop = top + 1.15;
+
+      bodyTop = CONTENT_TOP + HEADING_MAX_H + 0.1;
     }
 
-    const bodySize = pickBodyFontSize(slide.body, 16);
-    const bodyH = 5.4 - bodyTop;
+    const bodyH = CONTENT_BOTTOM - bodyTop;
 
+    // Тело — по центру вертикально в своей зоне, чтобы «дышало»
     s.addText(slide.body, {
-      x: 0.7, y: bodyTop, w: 8.6, h: bodyH,
-      fontSize: bodySize, color: '000000',
+      x: CONTENT_X,
+      y: bodyTop,
+      w: CONTENT_W,
+      h: bodyH,
+      fontSize: bodySize,
+      color: '000000',
       fontFace: 'Times New Roman',
-      valign: 'middle',
-      lineSpacingMultiple: 1.35
+      valign: 'middle',              // ← по центру зоны (не прижато к верху)
+      lineSpacingMultiple: 1.3,
+      fit: 'shrink',
+      shrinkText: true
     });
   });
 }
@@ -561,7 +613,6 @@ async function downloadPDF() {
     container.style.width = '1600px';
     container.style.fontFamily = 'Arial, sans-serif';
 
-    // Титул
     const titleDiv = document.createElement('div');
     titleDiv.style.cssText = `
       width: 1600px; height: 900px; page-break-after: always;
@@ -607,7 +658,6 @@ async function downloadPDF() {
     }
     container.appendChild(titleDiv);
 
-    // Контент
     p.slides.forEach(slide => {
       const div = document.createElement('div');
       div.style.cssText = `
