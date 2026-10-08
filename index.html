@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Presentation Generator</title>
+<script src="https://unpkg.com/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container">
+  <header>
+    <div class="header-top">
+      <h1>Presentation Generator</h1>
+      <button class="theme-toggle" onclick="toggleTheme()" title="Сменить тему">
+        <span id="themeIcon">🌙</span>
+      </button>
+    </div>
+    <p class="subtitle">Автоматическая генерация презентаций и рефератов за секунды</p>
+  </header>
+
+  <div class="dashboard">
+    <div class="card">
+      <h2>✨ Новая презентация</h2>
+      <p>Свободный шаблон с тёмным дизайном и случайными темами</p>
+      <button class="btn-primary" onclick="openModal()">Создать презентацию</button>
+    </div>
+    <div class="card reaviz">
+      <h2>🎓 РЕАВИЗ</h2>
+      <p>Типовой шаблон мед. университета «РЕАВИЗ». Год подставляется автоматически</p>
+      <button class="btn-reaviz" onclick="openReavizModal()">Создать по шаблону</button>
+    </div>
+    <div class="card ref">
+      <h2>📄 Реферат РЕАВИЗ</h2>
+      <p>Оформленный реферат: титульный лист, содержание, главы, список литературы. DOCX и PDF</p>
+      <button class="btn-ref" onclick="openRefModal()">Создать реферат</button>
+    </div>
+    <div class="card">
+      <h2>📁 Последняя презентация</h2>
+      <div id="lastPreview">Пока нет созданных презентаций</div>
+      <button class="btn-secondary" id="lastBtn" onclick="recreateLast()" disabled>Восстановить данные</button>
+    </div>
+  </div>
+
+  <div id="status" class="status"></div>
+</div>
+
+<!-- МОДАЛКА: СВОБОДНАЯ -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3>Создание презентации</h3>
+    <p class="modal-sub">Свободный шаблон</p>
+
+    <div class="form-group">
+      <label>ФИО студента</label>
+      <input type="text" id="fio" placeholder="Иванов И.И.">
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Группа</label>
+        <input type="text" id="group" placeholder="ИС-21">
+      </div>
+      <div class="form-group">
+        <label>Дисциплина</label>
+        <input type="text" id="subject" placeholder="Программирование">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Кто проверил</label>
+      <input type="text" id="teacher" placeholder="Петров П.П.">
+    </div>
+    <div class="form-group">
+      <label>Количество слайдов</label>
+      <input type="number" id="slideCount" value="8" min="3" max="30">
+    </div>
+    <div class="form-group">
+      <label>Фоновое фото (опционально)</label>
+      <input type="file" id="photoAll" class="file-input" accept="image/*">
+      <p class="hint" id="fr_bgSaved"></p>
+      <p class="hint">Не выбрано — тёмный фон или автоподбор фото по теме</p>
+    </div>
+    <div class="form-group">
+      <label>Автоподбор фото из интернета (по теме)</label>
+      <input type="text" id="unsplashQuery" placeholder="по-английски, например: medicine, anatomy">
+      <p class="hint">Оставь пустым, если не нужно. Если фото не загрузится — будет тёмный фон</p>
+    </div>
+    <div class="form-group">
+      <label>Фон на весь слайд</label>
+      <select id="fr_bgFit">
+        <option value="stretch" selected>Растянуть на весь слайд (без обрезки)</option>
+        <option value="blur">Целиком по центру, края размыты (без искажений)</option>
+        <option value="cover">Заполнить слайд с обрезкой краёв</option>
+      </select>
+      <p class="hint">«Растянуть» показывает всю картинку, но может слегка исказить её, если пропорции не 16:9</p>
+    </div>
+    <div class="form-group">
+      <label>Фото по теме слайдов</label>
+      <select id="fr_photos">
+        <option value="none">Не добавлять</option>
+        <option value="sparse" selected>Только на слайдах, где мало текста</option>
+        <option value="all">На каждом слайде</option>
+      </select>
+      <p class="hint">Подбираются из Wikimedia Commons по заголовку слайда (нужен интернет)</p>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Переход между слайдами</label>
+        <select id="fr_trans">
+          <option value="none">Без перехода</option>
+          <option value="fade" selected>Плавное затухание</option>
+          <option value="push">Сдвиг</option>
+          <option value="wipe">Шторка</option>
+          <option value="zoom">Масштаб</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Анимация элементов</label>
+        <select id="fr_anim">
+          <option value="none">Без анимации</option>
+          <option value="fade">Плавное появление</option>
+          <option value="dynamic" selected>Динамичная</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Запуск анимации</label>
+      <select id="fr_astart">
+        <option value="auto" selected>Автоматически</option>
+        <option value="click">По щелчку</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Служебные слайды</label>
+      <label class="check-row"><input type="checkbox" id="fr_plan"> Слайд «План»</label>
+      <label class="check-row"><input type="checkbox" id="fr_thanks"> Слайд «Спасибо за внимание»</label>
+      <textarea id="fr_lit" style="min-height: 70px;" placeholder="Список литературы — по одному источнику в строке"></textarea>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Шрифт</label>
+        <select id="fr_font"><option value="Times New Roman">Times New Roman</option><option value="Arial" selected>Arial</option><option value="Calibri">Calibri</option><option value="Georgia">Georgia</option></select>
+      </div>
+      <div class="form-group">
+        <label>Линия под заголовком</label>
+        <select id="fr_rule"><option value="under" selected>Есть</option><option value="none">Нет</option></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Цвет заголовков</label>
+      <label class="check-row"><input type="checkbox" id="fr_headAuto" checked> Подобрать автоматически</label>
+      <input type="color" id="fr_headColor" value="#1f3a6e" class="color-input">
+    </div>
+    <div class="form-group">
+      <label>Затемнение фонового фото</label>
+      <select id="fr_dim">
+        <option value="0">Без затемнения</option>
+        <option value="0.3">Слабое</option>
+        <option value="0.5" selected>Среднее</option>
+        <option value="0.7">Сильное</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Текст презентации</label>
+      <textarea id="content" placeholder="Заголовок можно написать отдельной короткой строкой или через #. Абзацы разделяй пустой строкой, пункты списка начинай с «- »."></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Отмена</button>
+      <button class="btn-primary" onclick="generateFree()">Сгенерировать</button>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛКА: РЕАВИЗ -->
+<div class="modal-overlay" id="reavizModal">
+  <div class="modal">
+    <h3>🎓 Шаблон РЕАВИЗ</h3>
+    <p class="modal-sub">Группа, факультет и проверяющий уже подставлены. Год подставится сам</p>
+
+    <div class="form-group">
+      <label>Дисциплина *</label>
+      <input type="text" id="rv_subject" value="Биологическая химия – биохимия полости рта">
+    </div>
+    <div class="form-group">
+      <label>Тема презентации *</label>
+      <textarea id="rv_topic" placeholder="Эмболия. Виды." style="min-height: 70px;"></textarea>
+    </div>
+    <div class="form-group">
+      <label>ФИО студента *</label>
+      <input type="text" id="rv_fio" placeholder="Моренко И.И.">
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Группа</label>
+        <input type="text" id="rv_group" value="1125-02108">
+      </div>
+      <div class="form-group">
+        <label>Факультет</label>
+        <input type="text" id="rv_faculty" value="стоматологического факультета">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Выполнил(а)</label>
+      <select id="rv_gender">
+        <option value="auto">Определить по ФИО</option>
+        <option value="m">Выполнил студент</option>
+        <option value="f">Выполнила студентка</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Проверил(а) *</label>
+      <input type="text" id="rv_teacher" value="Самыкина Ольга Викторовна">
+    </div>
+    <div class="form-group">
+      <label>Количество слайдов *</label>
+      <input type="number" id="rv_slideCount" value="9" min="3" max="30">
+    </div>
+    <div class="form-group">
+      <label>Фон РЕАВИЗ *</label>
+      <input type="file" id="rv_bg" class="file-input" accept="image/*">
+      <p class="hint" id="rv_bgSaved"></p>
+    </div>
+    <div class="form-group">
+      <label>Где на фоне логотип</label>
+      <select id="rv_logo">
+        <option value="right">Справа сверху</option>
+        <option value="left">Слева сверху</option>
+        <option value="none">Логотипа нет</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Фон на весь слайд</label>
+      <select id="rv_bgFit">
+        <option value="stretch" selected>Растянуть</option>
+        <option value="blur">Целиком + размытие краёв</option>
+        <option value="cover">Заполнить с обрезкой</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Фото по теме слайдов</label>
+      <select id="rv_photos">
+        <option value="none">Не добавлять</option>
+        <option value="sparse" selected>Только где мало текста</option>
+        <option value="all">На каждом слайде</option>
+      </select>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Переход</label>
+        <select id="rv_trans">
+          <option value="none">Без перехода</option>
+          <option value="fade" selected>Плавное затухание</option>
+          <option value="push">Сдвиг</option>
+          <option value="wipe">Шторка</option>
+          <option value="zoom">Масштаб</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Анимация</label>
+        <select id="rv_anim">
+          <option value="none">Без анимации</option>
+          <option value="fade">Плавное появление</option>
+          <option value="dynamic" selected>Динамичная</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Запуск анимации</label>
+      <select id="rv_astart">
+        <option value="auto" selected>Автоматически</option>
+        <option value="click">По щелчку</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Служебные слайды</label>
+      <label class="check-row"><input type="checkbox" id="rv_plan"> План</label>
+      <label class="check-row"><input type="checkbox" id="rv_thanks"> Спасибо за внимание</label>
+      <textarea id="rv_lit" style="min-height: 70px;" placeholder="Список литературы"></textarea>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Шрифт</label>
+        <select id="rv_font"><option value="Times New Roman" selected>Times New Roman</option><option value="Arial">Arial</option><option value="Calibri">Calibri</option></select>
+      </div>
+      <div class="form-group">
+        <label>Линия</label>
+        <select id="rv_rule"><option value="under" selected>Есть</option><option value="none">Нет</option></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Цвет заголовков</label>
+      <label class="check-row"><input type="checkbox" id="rv_headAuto" checked> Подобрать автоматически</label>
+      <input type="color" id="rv_headColor" value="#1f3a6e" class="color-input">
+    </div>
+    <div class="form-group">
+      <label>Текст презентации *</label>
+      <textarea id="rv_content" placeholder="Заголовок можно писать отдельной короткой строкой или через #."></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeReavizModal()">Отмена</button>
+      <button class="btn-reaviz" onclick="generateReaviz()">Сгенерировать</button>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛКА: ПРЕВЬЮ ПРЕЗЕНТАЦИИ -->
+<div class="modal-overlay" id="previewModal">
+  <div class="modal preview-modal">
+    <h3>📝 Предпросмотр и редактирование</h3>
+    <p class="modal-sub">Точный вид слайдов. Можно править текст и заголовки</p>
+
+    <div id="previewSlides" class="preview-slides"></div>
+
+    <div class="modal-actions sticky-actions">
+      <button class="btn-secondary" onclick="closePreview()">← Назад</button>
+      <button class="btn-secondary" onclick="downloadPDF()">📄 Скачать PDF</button>
+      <button class="btn-primary" onclick="downloadPPTX()">📥 Скачать PPTX</button>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛКА: РЕФЕРАТ -->
+<div class="modal-overlay" id="refModal">
+  <div class="modal">
+    <h3>📄 Реферат РЕАВИЗ</h3>
+    <p class="modal-sub">Титульный лист, содержание, главы и список литературы. Год и нумерация — автоматически</p>
+
+    <div class="form-group">
+      <label>Дисциплина (по чему реферат) *</label>
+      <input type="text" id="rf_subject" value="страноведению">
+    </div>
+    <div class="form-group">
+      <label>Тема реферата *</label>
+      <input type="text" id="rf_topic" placeholder="Скандинавская мифология">
+    </div>
+    <div class="form-group">
+      <label>ФИО студента *</label>
+      <input type="text" id="rf_fio" placeholder="Хайруллина Э.А.">
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Курс</label>
+        <input type="text" id="rf_course" value="1">
+      </div>
+      <div class="form-group">
+        <label>Группа</label>
+        <input type="text" id="rf_group" value="25-2105">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Факультет</label>
+      <input type="text" id="rf_faculty" value="Стоматология">
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Кафедра *</label>
+        <input type="text" id="rf_kafedra" value="гуманитарных дисциплин">
+      </div>
+      <div class="form-group">
+        <label>Город</label>
+        <input type="text" id="rf_city" value="САМАРА">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Проверил (ФИО) *</label>
+      <input type="text" id="rf_teacher" placeholder="Гончарова Н.Ю.">
+    </div>
+    <div class="form-group">
+      <label>Должность и степень проверяющего</label>
+      <input type="text" id="rf_teacherPost" placeholder="доцент, к.ф.н.">
+    </div>
+    <div class="form-group">
+      <label>Выполнил(а)</label>
+      <select id="rf_gender">
+        <option value="auto">Определить по ФИО</option>
+        <option value="m">Выполнил студент</option>
+        <option value="f">Выполнила студентка</option>
+      </select>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Шрифт</label>
+        <select id="rf_font">
+          <option value="Times New Roman" selected>Times New Roman</option>
+          <option value="Arial">Arial</option>
+          <option value="Calibri">Calibri</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Размер</label>
+        <select id="rf_fontSize">
+          <option value="12">12 pt</option>
+          <option value="14" selected>14 pt</option>
+        </select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="form-group">
+        <label>Межстрочный интервал</label>
+        <select id="rf_lineHeight">
+          <option value="1">1.0</option>
+          <option value="1.15">1.15</option>
+          <option value="1.5" selected>1.5</option>
+          <option value="2">2.0</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Отступ абзаца (pt)</label>
+        <select id="rf_indent">
+          <option value="0">Нет</option>
+          <option value="35" selected>35</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Текст реферата *</label>
+      <textarea id="rf_content" style="min-height: 280px;" placeholder="# Введение
+
+Актуальность исследования...
+
+# Глава 1. Источники
+
+Текст главы...
+
+- Первый пункт
+- Второй пункт
+
+# Заключение
+
+Выводы...
+
+# Список литературы
+
+1. Беовульф. Старшая Эдда...
+2. Гуревич А.Я. «Эдда» и сага..."></textarea>
+      <p class="hint">Заголовки разделов — строкой, начиная с «#». Список литературы — пунктами «1. …». Содержание соберётся автоматически</p>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeRefModal()">Отмена</button>
+      <button class="btn-ref" onclick="generateRef()">Сгенерировать</button>
+    </div>
+  </div>
+</div>
+
+<!-- МОДАЛКА: ПРЕВЬЮ РЕФЕРАТА -->
+<div class="modal-overlay" id="refPreviewModal">
+  <div class="modal preview-modal">
+    <h3>📄 Предпросмотр реферата</h3>
+    <p class="modal-sub">Можно править текст и заголовки прямо здесь. Нумерация обновится при скачивании</p>
+
+    <div id="refPages" class="ref-pages"></div>
+
+    <div class="modal-actions sticky-actions">
+      <button class="btn-secondary" onclick="closeRefPreview()">← Назад</button>
+      <button class="btn-secondary" onclick="downloadRefPDF()">📄 Скачать PDF</button>
+      <button class="btn-ref" onclick="downloadRefDOCX()">📥 Скачать DOCX</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
